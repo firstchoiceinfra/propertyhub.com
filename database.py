@@ -1,4 +1,3 @@
-import json
 import firebase_admin
 from firebase_admin import credentials, firestore
 import streamlit as st
@@ -7,10 +6,16 @@ import streamlit as st
 @st.cache_resource
 def init_firebase():
     if not firebase_admin._apps:
-        # Loading the raw JSON string from Streamlit secrets
-        cred_dict = json.loads(st.secrets["FIREBASE_JSON"])
-        cred = credentials.Certificate(cred_dict)
+        # Fetch secrets and convert to a standard Python dictionary
+        firebase_secrets = dict(st.secrets["firebase"])
+        
+        # CRITICAL FIX: Ensures newlines in the private key are parsed correctly
+        firebase_secrets["private_key"] = firebase_secrets["private_key"].replace("\\n", "\n")
+        
+        # Initialize credentials
+        cred = credentials.Certificate(firebase_secrets)
         firebase_admin.initialize_app(cred)
+        
     return firestore.client()
 
 db = init_firebase()
