@@ -1,15 +1,6 @@
 import streamlit as st
 import pandas as pd
-
-# Dummy Vendor Data
-dummy_vendors = pd.DataFrame({
-    "Vendor_Name": ["Rahul Architects", "Shree Ram Builders", "A1 Painters", "Modern Interiors", "Gupta Hardware", "Pandit Ji Vastu"],
-    "Category": ["Architect", "Contractor", "Painter", "Interior Designer", "Hardware", "Vastu / Priest"],
-    "Location": ["New Amar Nagar", "Wardha Road", "Sitabuldi", "Dharampeth", "New Amar Nagar", "New Amar Nagar"],
-    "Experience_Years": [10, 15, 5, 8, 20, 25],
-    "Rating": [4.8, 4.5, 4.1, 4.9, 4.3, 5.0],
-    "Verified": ["Yes", "Yes", "No", "Yes", "Yes", "Yes"]
-})
+from database import fetch_all_vendors
 
 def show_vendor_ecosystem():
     st.markdown("""
@@ -36,10 +27,22 @@ def show_vendor_ecosystem():
 
     st.markdown('<h2 style="color: #0f766e; font-weight:700;">🛠️ Vendor Ecosystem</h2>', unsafe_allow_html=True)
     
+    # 1. Fetch Live Data
+    raw_data = fetch_all_vendors()
+    
+    if not raw_data:
+        st.info("No vendors found in the database. Please register vendors via the Admin Panel.")
+        return
+
+    df = pd.DataFrame(raw_data)
+    
+    # 2. UI Filters (Dynamic)
     col1, col2, col3 = st.columns(3)
-    category_filter = col1.selectbox("Select Service", ["All", "Architect", "Contractor", "Painter", "Interior Designer", "Hardware", "Vastu / Priest"])
-    location_filter = col2.selectbox("Location", ["All", "New Amar Nagar", "Wardha Road", "Sitabuldi", "Dharampeth"])
-    exp_filter = col3.slider("Min Experience (Years)", 0, 30, 2)
+    category_filter = col1.selectbox("Select Service", ["All"] + list(df["Category"].unique()))
+    location_filter = col2.selectbox("Location", ["All"] + list(df["Location"].unique()))
+    
+    max_exp = int(df["Experience_Years"].max()) if not df.empty else 30
+    exp_filter = col3.slider("Min Experience (Years)", 0, max_exp, 2)
     
     with st.expander("⭐ Trust & Quality Filters"):
         col4, col5 = st.columns(2)
@@ -48,7 +51,8 @@ def show_vendor_ecosystem():
 
     st.divider()
     
-    filtered_vendors = dummy_vendors.copy()
+    # 3. Filter Logic
+    filtered_vendors = df.copy()
     if category_filter != "All": filtered_vendors = filtered_vendors[filtered_vendors["Category"] == category_filter]
     if location_filter != "All": filtered_vendors = filtered_vendors[filtered_vendors["Location"] == location_filter]
     filtered_vendors = filtered_vendors[filtered_vendors["Experience_Years"] >= exp_filter]
@@ -57,16 +61,16 @@ def show_vendor_ecosystem():
         
     st.markdown(f"<p style='color:#64748b; font-weight:600;'>{len(filtered_vendors)} Professionals Found</p>", unsafe_allow_html=True)
     
-    # Render Vendor Cards
+    # 4. Render Vendor Cards
     for _, row in filtered_vendors.iterrows():
-        verified_html = '<span class="verified-tag">✓ Verified Partner</span>' if row['Verified'] == 'Yes' else ''
+        verified_html = '<span class="verified-tag">✓ Verified Partner</span>' if row.get('Verified') == 'Yes' else ''
         st.markdown(f"""
         <div class="vendor-card">
-            <h4 style="margin:0; color:#0f172a; font-size:1.2rem; font-weight: 700;">{row['Vendor_Name']}</h4>
-            <p style="margin:6px 0; color:#64748b; font-size: 0.95rem;">🛠️ {row['Category']} | 📍 {row['Location']}</p>
+            <h4 style="margin:0; color:#0f172a; font-size:1.2rem; font-weight: 700;">{row.get('Vendor_Name', 'N/A')}</h4>
+            <p style="margin:6px 0; color:#64748b; font-size: 0.95rem;">🛠️ {row.get('Category', 'N/A')} | 📍 {row.get('Location', 'N/A')}</p>
             <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
-                <span style="color:#eab308; font-weight:700;">⭐ {row['Rating']}</span>
-                <span style="color:#475569; font-size:0.95rem; font-weight: 500;">💼 {row['Experience_Years']} Years Exp.</span>
+                <span style="color:#eab308; font-weight:700;">⭐ {row.get('Rating', 0)}</span>
+                <span style="color:#475569; font-size:0.95rem; font-weight: 500;">💼 {row.get('Experience_Years', 0)} Years Exp.</span>
                 {verified_html}
             </div>
         </div>
