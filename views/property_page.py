@@ -1,16 +1,7 @@
 import streamlit as st
 import pandas as pd
-
-# Dummy Property Data
-dummy_properties = pd.DataFrame({
-    "Property_Name": ["Firstchoice Premium Plot", "Earth Heights 2 Flat", "Luxury Villa", "Commercial Shop"],
-    "Type": ["Plot", "Flat", "Villa", "Commercial"],
-    "Location": ["New Amar Nagar", "New Amar Nagar", "Wardha Road", "Sitabuldi"],
-    "Budget_Lakhs": [25, 45, 120, 80],
-    "RERA_Approved": ["Yes", "Yes", "Yes", "No"],
-    "Facing": ["East", "East", "North", "West"],
-    "Status": ["Ready to Move", "Under Construction", "Ready to Move", "Ready to Move"]
-})
+# Import our database connection
+from database import fetch_all_properties
 
 def show_advanced_filters():
     # Premium Card Styling
@@ -40,13 +31,27 @@ def show_advanced_filters():
 
     st.markdown('<h2 style="color: #1e3a8a; font-weight:700;">🏢 Property Listings</h2>', unsafe_allow_html=True)
     
-    # Primary Filters
-    col1, col2, col3 = st.columns(3)
-    loc_filter = col1.selectbox("Location", ["All", "New Amar Nagar", "Wardha Road", "Sitabuldi"])
-    type_filter = col2.selectbox("Property Type", ["All", "Plot", "Flat", "Villa", "Commercial"])
-    budget_filter = col3.slider("Budget (₹ Lakhs)", 10, 200, (10, 150))
+    # 1. Fetch Live Data from Firebase
+    raw_data = fetch_all_properties()
     
-    # Advanced Filters
+    # Fallback if the database is empty
+    if not raw_data:
+        st.info("No properties found in the database. Please add listings via the Admin Panel.")
+        return
+
+    # Convert to DataFrame
+    df = pd.DataFrame(raw_data)
+    
+    # 2. UI Filters
+    col1, col2, col3 = st.columns(3)
+    loc_filter = col1.selectbox("Location", ["All"] + list(df["Location"].unique()))
+    type_filter = col2.selectbox("Property Type", ["All"] + list(df["Type"].unique()))
+    
+    # Dynamic budget slider based on actual database values
+    min_budget = int(df["Budget_Lakhs"].min()) if not df.empty else 10
+    max_budget = int(df["Budget_Lakhs"].max()) if not df.empty else 200
+    budget_filter = col3.slider("Budget (₹ Lakhs)", min_budget, max_budget, (min_budget, max_budget))
+    
     with st.expander("✨ Advanced Filters (RERA, Facing, Status)"):
         col4, col5, col6 = st.columns(3)
         rera_filter = col4.radio("RERA Approved?", ["All", "Yes", "No"], horizontal=True)
@@ -55,8 +60,8 @@ def show_advanced_filters():
         
     st.divider()
     
-    # Filter Logic
-    filtered_df = dummy_properties.copy()
+    # 3. Filter Logic
+    filtered_df = df.copy()
     if loc_filter != "All": filtered_df = filtered_df[filtered_df["Location"] == loc_filter]
     if type_filter != "All": filtered_df = filtered_df[filtered_df["Type"] == type_filter]
     filtered_df = filtered_df[(filtered_df["Budget_Lakhs"] >= budget_filter[0]) & (filtered_df["Budget_Lakhs"] <= budget_filter[1])]
@@ -66,16 +71,16 @@ def show_advanced_filters():
         
     st.markdown(f"<p style='color:#64748b; font-weight:600;'>{len(filtered_df)} Properties Found</p>", unsafe_allow_html=True)
     
-    # Render Property Cards
+    # 4. Render Property Cards
     for _, row in filtered_df.iterrows():
-        rera_badge = '<span class="badge-rera">✅ RERA Approved</span>' if row['RERA_Approved'] == 'Yes' else ''
+        rera_badge = '<span class="badge-rera">✅ RERA Approved</span>' if row.get('RERA_Approved') == 'Yes' else ''
         st.markdown(f"""
         <div class="property-card">
-            <h3 class="property-title">{row['Property_Name']}</h3>
-            <p class="property-meta">📍 {row['Location']} | 📐 {row['Type']} | 🧭 {row['Facing']} Facing</p>
-            <div class="price-tag">₹ {row['Budget_Lakhs']} Lakhs</div>
+            <h3 class="property-title">{row.get('Property_Name', 'N/A')}</h3>
+            <p class="property-meta">📍 {row.get('Location', 'N/A')} | 📐 {row.get('Type', 'N/A')} | 🧭 {row.get('Facing', 'N/A')} Facing</p>
+            <div class="price-tag">₹ {row.get('Budget_Lakhs', 0)} Lakhs</div>
             <div style="margin-top: 10px;">
-                <span class="badge-status">{row['Status']}</span> {rera_badge}
+                <span class="badge-status">{row.get('Status', 'N/A')}</span> {rera_badge}
             </div>
         </div>
         """, unsafe_allow_html=True)
