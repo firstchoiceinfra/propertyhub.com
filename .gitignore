@@ -1,1 +1,22 @@
+# 1. Streamlit Secrets (सबसे महत्वपूर्ण - Firebase की चाबियां सुरक्षित रखने के लिए)
+.streamlit/
+secrets.toml
 
+# 2. Python Cache (सिस्टम द्वारा बनाई गई फालतू फाइलें)
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 3. Virtual Environments (लोकल एनवायरनमेंट फाइलें)
+venv/
+env/
+.venv/
+.env
+
+# 4. OS Files (Windows/Mac की सिस्टम फाइलें)
+.DS_Store
+Thumbs.db
+
+# 5. IDE Files (VS Code की सेटिंग फाइलें)
+.vscode/
+.idea/
