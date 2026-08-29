@@ -1,113 +1,114 @@
 import streamlit as st
 from views import property_page, vendor_page
 
-# 1. Page Configuration
+# 1. Page Configuration (Must be first)
 st.set_page_config(page_title="PropertyHub Premium", layout="wide", initial_sidebar_state="expanded")
 
-# 2. Advanced Premium CSS (No Black, Modern Light Theme)
+# 2. Premium English UI Custom CSS
 st.markdown("""
     <style>
-    /* Google Font Import */
-    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
 
     html, body, [class*="css"] {
         font-family: 'Poppins', sans-serif;
     }
 
-    /* Premium Sidebar Gradient */
+    /* Premium Sidebar */
     [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%);
-        border-right: 1px solid #cbd5e1;
+        background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+        border-right: 1px solid #e2e8f0;
     }
     
-    /* Styling the Radio Buttons to look like modern tabs */
+    /* Modern Navigation Radio Buttons */
     div.stRadio > div {
         background-color: transparent;
-        gap: 15px;
+        gap: 12px;
     }
     div.stRadio > div > label {
-        background-color: white;
+        background-color: #ffffff;
         padding: 12px 20px;
         border-radius: 12px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
         transition: all 0.3s ease;
         border: 1px solid #e2e8f0;
         cursor: pointer;
     }
     div.stRadio > div > label:hover {
         transform: translateY(-2px);
-        box-shadow: 0 8px 12px rgba(0,0,0,0.1);
+        box-shadow: 0 10px 15px -3px rgba(0,0,0,0.08);
         border-color: #3b82f6;
     }
 
-    /* Main Headings */
+    /* Titles */
     .premium-title {
-        background: -webkit-linear-gradient(45deg, #1e3a8a, #3b82f6);
+        background: linear-gradient(45deg, #1e3a8a, #3b82f6);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        font-weight: 700;
-        font-size: 2.5rem;
+        font-weight: 800;
+        font-size: 2.8rem;
         margin-bottom: 5px;
+        letter-spacing: -0.5px;
     }
     
-    /* Dashboard KPI Cards */
+    /* KPI Cards */
     .kpi-card {
-        background: white;
-        padding: 25px;
+        background: #ffffff;
+        padding: 24px;
         border-radius: 16px;
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
         text-align: center;
         border-top: 4px solid #3b82f6;
-        transition: transform 0.3s;
+        transition: transform 0.3s ease;
     }
     .kpi-card:hover {
         transform: translateY(-5px);
+        box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
     }
     .kpi-value {
-        font-size: 2.2rem;
+        font-size: 2.5rem;
         font-weight: 700;
         color: #0f172a;
+        line-height: 1.2;
     }
     .kpi-label {
         color: #64748b;
-        font-size: 1.1rem;
+        font-size: 1.05rem;
         font-weight: 600;
+        margin-top: 8px;
     }
     </style>
 """, unsafe_allow_html=True)
 
 # --- HOME DASHBOARD ---
 def show_home():
-    st.markdown('<h1 class="premium-title">प्रॉपर्टी हब इकोसिस्टम</h1>', unsafe_allow_html=True)
-    st.markdown('<p style="color:#64748b; font-size:1.2rem;">प्रॉपर्टी खोजने से लेकर, घर बनाने और गृह प्रवेश तक का वन-स्टॉप प्रीमियम सॉल्यूशन।</p>', unsafe_allow_html=True)
-    
-    st.write("---")
+    st.markdown('<h1 class="premium-title">PropertyHub Ecosystem</h1>', unsafe_allow_html=True)
+    st.markdown('<p style="color:#64748b; font-size:1.2rem; font-weight: 400; margin-bottom: 2rem;">A premium one-stop solution from finding properties to building and settling in.</p>', unsafe_allow_html=True)
     
     # Premium KPI Cards
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.markdown('<div class="kpi-card"><div class="kpi-value">1,250+</div><div class="kpi-label">प्रीमियम प्रॉपर्टीज़</div></div>', unsafe_allow_html=True)
+        st.markdown('<div class="kpi-card"><div class="kpi-value">1,250+</div><div class="kpi-label">Premium Properties</div></div>', unsafe_allow_html=True)
     with col2:
-        st.markdown('<div class="kpi-card"><div style="border-top-color:#10b981;" class="kpi-value">340+</div><div class="kpi-label">वेरिफाइड वेंडर्स</div></div>', unsafe_allow_html=True)
+        st.markdown('<div class="kpi-card" style="border-top-color:#10b981;"><div class="kpi-value">340+</div><div class="kpi-label">Verified Partners</div></div>', unsafe_allow_html=True)
     with col3:
-        st.markdown('<div class="kpi-card"><div style="border-top-color:#f59e0b;" class="kpi-value">5,000+</div><div class="kpi-label">हैप्पी कस्टमर्स</div></div>', unsafe_allow_html=True)
+        st.markdown('<div class="kpi-card" style="border-top-color:#f59e0b;"><div class="kpi-value">5,000+</div><div class="kpi-label">Happy Customers</div></div>', unsafe_allow_html=True)
 
 # --- MAIN ROUTER ---
 def main():
-    st.sidebar.markdown("### 🌟 नेविगेशन मेनू")
+    st.sidebar.markdown("<h3 style='color:#0f172a; font-weight:700;'>🌟 Navigation Menu</h3>", unsafe_allow_html=True)
     
-    menu = ["🏠 होम (Dashboard)", "🏢 प्रॉपर्टी लिस्टिंग", "🛠️ वेंडर इकोसिस्टम"]
+    menu = ["🏠 Home (Dashboard)", "🏢 Property Listings", "🛠️ Vendor Ecosystem"]
     choice = st.sidebar.radio("", menu)
     
     st.sidebar.write("---")
-    st.sidebar.markdown("<small style='color:#64748b;'>⚡ सिंगल-पेज आर्किटेक्चर (ज़ीरो फ्लिकर)</small>", unsafe_allow_html=True)
+    st.sidebar.markdown("<small style='color:#64748b; font-weight:500;'>⚡ Single-Page Architecture (Zero Flicker)</small>", unsafe_allow_html=True)
 
     # Seamless Routing
-    if choice == "🏠 होम (Dashboard)":
+    if choice == "🏠 Home (Dashboard)":
         show_home()
-    elif choice == "🏢 प्रॉपर्टी लिस्टिंग":
+    elif choice == "🏢 Property Listings":
         property_page.show_advanced_filters()
-    elif choice == "🛠️ वेंडर इकोसिस्टम":
+    elif choice == "🛠️ Vendor Ecosystem":
         vendor_page.show_vendor_ecosystem()
 
 if __name__ == "__main__":
