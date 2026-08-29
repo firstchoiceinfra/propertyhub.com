@@ -1,3 +1,4 @@
+import json
 import firebase_admin
 from firebase_admin import credentials, firestore
 import streamlit as st
@@ -6,16 +7,31 @@ import streamlit as st
 @st.cache_resource
 def init_firebase():
     if not firebase_admin._apps:
-        # Fetch secrets and convert to a standard Python dictionary
-        firebase_secrets = dict(st.secrets["firebase"])
-        
-        # CRITICAL FIX: Ensures newlines in the private key are parsed correctly
-        firebase_secrets["private_key"] = firebase_secrets["private_key"].replace("\\n", "\n")
-        
-        # Initialize credentials
-        cred = credentials.Certificate(firebase_secrets)
-        firebase_admin.initialize_app(cred)
-        
+        try:
+            # Method A: Raw JSON (Most stable)
+            if "FIREBASE_JSON" in st.secrets:
+                cred_dict = json.loads(st.secrets["FIREBASE_JSON"])
+            
+            # Method B: TOML Section (Fallback)
+            elif "firebase" in st.secrets:
+                cred_dict = dict(st.secrets["firebase"])
+                if "private_key" in cred_dict:
+                    # Fixes double-escaped newlines from copy-pasting
+                    cred_dict["private_key"] = cred_dict["private_key"].replace("\\n", "\n").replace("\\\\n", "\n")
+            else:
+                st.error("Firebase secrets are missing in Streamlit Cloud!")
+                st.stop()
+
+            # Initialize Firebase
+            cred = credentials.Certificate(cred_dict)
+            firebase_admin.initialize_app(cred)
+
+        except Exception as e:
+            st.error("🔥 Firebase Connection Error!")
+            st.write(f"Details: {e}")
+            st.write("Please update your Streamlit Secrets using the FIREBASE_JSON format.")
+            st.stop()
+
     return firestore.client()
 
 db = init_firebase()
