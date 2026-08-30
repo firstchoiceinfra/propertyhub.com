@@ -1,309 +1,268 @@
 import streamlit as st
-import pandas as pd
-import json
 import firebase_admin
-from firebase_admin import credentials, firestore
+from firebase_admin import credentials
+from firebase_admin import firestore
+import json
 
-# ---------------------------------------------------------
-# 1. PAGE CONFIGURATION (Must be the first command)
-# ---------------------------------------------------------
-st.set_page_config(page_title="PropertyHub Premium", layout="wide", initial_sidebar_state="expanded")
+# --- Page Config ---
+st.set_page_config(page_title="PropertyHub Premium", page_icon="🏢", layout="wide")
 
+# --- Premium Multi-Color Sidebar Design ---
+st.markdown(
+    """
+    <style>
+    /* साइडबार का प्रीमियम मल्टी-कलर बैकग्राउंड */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
+    }
+    
+    /* साइडबार के टेक्स्ट को सफेद और चमकदार बनाना */
+    [data-testid="stSidebar"] .css-17lntkn, 
+    [data-testid="stSidebar"] h1, 
+    [data-testid="stSidebar"] .stRadio label {
+        color: white !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
-# ---------------------------------------------------------
-# 2. FIREBASE DATABASE CONNECTION (Foolproof Method)
-# ---------------------------------------------------------
-@st.cache_resource
-def init_firebase():
-    if not firebase_admin._apps:
-        try:
-            # Check if JSON string is used
-            if "FIREBASE_JSON" in st.secrets:
-                raw_json = st.secrets["FIREBASE_JSON"]
-                # strict=False fixes the 'Invalid control character' error
-                cred_dict = json.loads(raw_json, strict=False)
-                
-            # Fallback for standard TOML format
-            elif "firebase" in st.secrets:
-                cred_dict = dict(st.secrets["firebase"])
-            else:
-                st.error("🔥 Firebase secrets missing in Streamlit Cloud!")
-                st.stop()
-            
-            # CRITICAL FIX: Ensure private key newlines are parsed correctly
-            if "private_key" in cred_dict:
-                cred_dict["private_key"] = cred_dict["private_key"].replace("\\n", "\n").replace("\\\\n", "\n")
-                
-            cred = credentials.Certificate(cred_dict)
-            firebase_admin.initialize_app(cred)
-            
-        except Exception as e:
-            st.error("🔥 Firebase Connection Error! कृपया असली JSON डेटा Secrets में सही फॉर्मेट में डालें।")
-            st.write(f"Details: {e}")
-            st.stop()
-            
-    return firestore.client()
+# --- Firebase Initialization ---
+if not firebase_admin._apps:
+    key_dict = json.loads(st.secrets["FIREBASE_JSON"])
+    cred = credentials.Certificate(key_dict)
+    firebase_admin.initialize_app(cred)
 
-db = init_firebase()
+db = firestore.client()
 
-# --- Database Helper Functions ---
+# --- Database Fetch Functions ---
 def fetch_all_properties():
-    return [doc.to_dict() for doc in db.collection('properties').stream()]
+    properties = []
+    for doc in db.collection('properties').stream():
+        data = doc.to_dict()
+        data['doc_id'] = doc.id
+        properties.append(data)
+    return properties
 
 def fetch_all_vendors():
-    return [doc.to_dict() for doc in db.collection('vendors').stream()]
+    vendors = []
+    for doc in db.collection('vendors').stream():
+        data = doc.to_dict()
+        data['doc_id'] = doc.id
+        vendors.append(data)
+    return vendors
 
-def add_property(prop_data):
-    try:
-        db.collection('properties').add(prop_data)
-        return True
-    except Exception as e:
-        st.error(f"Error adding property: {e}")
-        return False
+def fetch_all_leads():
+    leads = []
+    for doc in db.collection('leads').stream():
+        data = doc.to_dict()
+        data['doc_id'] = doc.id
+        leads.append(data)
+    return leads
 
-def add_vendor(vendor_data):
-    try:
-        db.collection('vendors').add(vendor_data)
-        return True
-    except Exception as e:
-        st.error(f"Error adding vendor: {e}")
-        return False
-
-
-# ---------------------------------------------------------
-# 3. PREMIUM UI & CSS STYLING
-# ---------------------------------------------------------
-st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
-    html, body, [class*="css"] { font-family: 'Poppins', sans-serif; }
-    
-    /* Sidebar */
-    [data-testid="stSidebar"] { background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%); border-right: 1px solid #e2e8f0; }
-    div.stRadio > div { background-color: transparent; gap: 12px; }
-    div.stRadio > div > label { background-color: #ffffff; padding: 12px 20px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); transition: all 0.3s ease; border: 1px solid #e2e8f0; cursor: pointer; }
-    div.stRadio > div > label:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.08); border-color: #3b82f6; }
-    
-    /* Titles */
-    .premium-title { background: linear-gradient(45deg, #1e3a8a, #3b82f6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 800; font-size: 2.8rem; margin-bottom: 5px; }
-    
-    /* KPI Cards */
-    .kpi-card { background: #ffffff; padding: 24px; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); text-align: center; border-top: 4px solid #3b82f6; transition: transform 0.3s ease; }
-    .kpi-card:hover { transform: translateY(-5px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
-    .kpi-value { font-size: 2.5rem; font-weight: 700; color: #0f172a; line-height: 1.2; }
-    .kpi-label { color: #64748b; font-size: 1.05rem; font-weight: 600; margin-top: 8px; }
-
-    /* Property & Vendor Cards */
-    .property-card, .vendor-card, .admin-card {
-        background: #ffffff; border-radius: 12px; padding: 24px;
-        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid #f1f5f9;
-        transition: all 0.3s ease; margin-bottom: 20px;
-    }
-    .property-card:hover { transform: translateY(-5px); box-shadow: 0 15px 25px -5px rgba(0,0,0,0.1); border-color: #3b82f6; }
-    .vendor-card { border-left: 6px solid #0f766e; }
-    .vendor-card:hover { transform: translateX(4px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
-    .admin-card { border-top: 4px solid #1e3a8a; }
-    
-    /* Badges & Tags */
-    .badge-rera { background: #dcfce7; color: #166534; padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; margin-left: 8px;}
-    .badge-status { background: #e0e7ff; color: #3730a3; padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; }
-    .price-tag { color: #1e3a8a; font-size: 1.5rem; font-weight: 700; margin: 12px 0; }
-    .verified-tag { color: #059669; font-weight: 600; font-size: 0.85rem; background: #d1fae5; padding: 4px 10px; border-radius: 20px;}
-    </style>
-""", unsafe_allow_html=True)
-
-
-# ---------------------------------------------------------
-# 4. MODULE 1: HOME DASHBOARD
-# ---------------------------------------------------------
-def show_home():
-    st.markdown('<h1 class="premium-title">PropertyHub Ecosystem</h1>', unsafe_allow_html=True)
-    st.markdown('<p style="color:#64748b; font-size:1.2rem; font-weight: 400; margin-bottom: 2rem;">A premium one-stop solution from finding properties to building and settling in.</p>', unsafe_allow_html=True)
-    
-    col1, col2, col3 = st.columns(3)
-    with col1: st.markdown('<div class="kpi-card"><div class="kpi-value">Live</div><div class="kpi-label">Firebase Connected</div></div>', unsafe_allow_html=True)
-    with col2: st.markdown('<div class="kpi-card" style="border-top-color:#10b981;"><div class="kpi-value">Verified</div><div class="kpi-label">Partners & Vendors</div></div>', unsafe_allow_html=True)
-    with col3: st.markdown('<div class="kpi-card" style="border-top-color:#f59e0b;"><div class="kpi-value">Zero</div><div class="kpi-label">Flicker Navigation</div></div>', unsafe_allow_html=True)
-
-
-# ---------------------------------------------------------
-# 5. MODULE 2: PROPERTY LISTINGS
-# ---------------------------------------------------------
+# --- Page 1: Property Listings (with 99acres Search & Lead Form) ---
 def show_property_listings():
-    st.markdown('<h2 style="color: #1e3a8a; font-weight:700;">🏢 Property Listings</h2>', unsafe_allow_html=True)
+    st.title("🏢 Premium Property Listings")
     
-    raw_data = fetch_all_properties()
-    if not raw_data:
-        st.info("No properties found. Please add listings via the Admin Panel.")
-        return
-
-    df = pd.DataFrame(raw_data)
-    
+    st.markdown("### 🔍 Search your Dream Property")
     col1, col2, col3 = st.columns(3)
-    loc_filter = col1.selectbox("Location", ["All"] + list(df["Location"].unique()))
-    type_filter = col2.selectbox("Property Type", ["All"] + list(df["Type"].unique()))
-    
-    min_budget = int(df["Budget_Lakhs"].min()) if not df.empty else 10
-    max_budget = int(df["Budget_Lakhs"].max()) if not df.empty else 200
-    budget_filter = col3.slider("Budget (₹ Lakhs)", min_budget, max_budget, (min_budget, max_budget))
-    
-    with st.expander("✨ Advanced Filters"):
-        col4, col5, col6 = st.columns(3)
-        rera_filter = col4.radio("RERA Approved?", ["All", "Yes", "No"], horizontal=True)
-        facing_filter = col5.selectbox("Facing", ["All", "East", "West", "North", "South"])
-        status_filter = col6.selectbox("Project Status", ["All", "Ready to Move", "Under Construction"])
-        
-    st.divider()
-    
-    filtered_df = df.copy()
-    if loc_filter != "All": filtered_df = filtered_df[filtered_df["Location"] == loc_filter]
-    if type_filter != "All": filtered_df = filtered_df[filtered_df["Type"] == type_filter]
-    filtered_df = filtered_df[(filtered_df["Budget_Lakhs"] >= budget_filter[0]) & (filtered_df["Budget_Lakhs"] <= budget_filter[1])]
-    if rera_filter != "All": filtered_df = filtered_df[filtered_df["RERA_Approved"] == rera_filter]
-    if facing_filter != "All": filtered_df = filtered_df[filtered_df["Facing"] == facing_filter]
-    if status_filter != "All": filtered_df = filtered_df[filtered_df["Status"] == status_filter]
-        
-    st.markdown(f"<p style='color:#64748b; font-weight:600;'>{len(filtered_df)} Properties Found</p>", unsafe_allow_html=True)
-    
-    for _, row in filtered_df.iterrows():
-        rera_badge = '<span class="badge-rera">✅ RERA Approved</span>' if row.get('RERA_Approved') == 'Yes' else ''
-        st.markdown(f"""
-        <div class="property-card">
-            <h3 style="margin:0; color:#0f172a;">{row.get('Property_Name', 'N/A')}</h3>
-            <p style="margin:8px 0; color:#64748b;">📍 {row.get('Location', 'N/A')} | 📐 {row.get('Type', 'N/A')} | 🧭 {row.get('Facing', 'N/A')} Facing</p>
-            <div class="price-tag">₹ {row.get('Budget_Lakhs', 0)} Lakhs</div>
-            <div style="margin-top: 10px;">
-                <span class="badge-status">{row.get('Status', 'N/A')}</span> {rera_badge}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+    with col1:
+        search_loc = st.text_input("📍 Location (e.g. Nagpur)").lower()
+    with col2:
+        search_type = st.selectbox("🏠 Type", ["All", "Flat / Apartment", "Plot / Land", "Villa / Independent House", "Commercial"])
+    with col3:
+        max_budget = st.number_input("💰 Max Budget (₹)", min_value=0, value=0, step=100000)
 
+    st.markdown("---")
+    
+    properties = fetch_all_properties()
+    
+    for prop in properties:
+        # Filters Logic
+        if search_loc and search_loc not in prop.get('location', '').lower():
+            continue
+        if search_type != "All" and search_type != prop.get('prop_type', ''):
+            continue
+        if max_budget > 0 and prop.get('price', 0) > max_budget:
+            continue
 
-# ---------------------------------------------------------
-# 6. MODULE 3: VENDOR ECOSYSTEM
-# ---------------------------------------------------------
+        with st.container():
+            # Property Image
+            if prop.get('image_url'):
+                st.image(prop['image_url'], use_container_width=True)
+            
+            # Details
+            st.subheader(f"{prop.get('title', 'N/A')} ({prop.get('status', 'N/A')})")
+            st.markdown(f"**{prop.get('prop_type', '')}** | **{prop.get('bhk', 'N/A')}** | **{prop.get('area', 'N/A')}**")
+            st.markdown(f"📍 {prop.get('location', '')} | 🏷️ **₹{prop.get('price', 0):,}**")
+            
+            if prop.get('rera_id'):
+                st.caption(f"✅ RERA ID: {prop.get('rera_id')}")
+            
+            if prop.get('amenities'):
+                st.write(f"✨ **Amenities:** {', '.join(prop.get('amenities', []))}")
+
+            # Contact Seller / Lead Gen Form
+            with st.expander("📞 Contact Seller / Express Interest"):
+                st.write("Leave your details, and our agent will contact you.")
+                buyer_name = st.text_input("Your Name", key=f"name_{prop['doc_id']}")
+                buyer_phone = st.text_input("Your Phone Number", key=f"phone_{prop['doc_id']}")
+                if st.button("Send Interest", key=f"btn_{prop['doc_id']}"):
+                    if buyer_name and buyer_phone:
+                        lead_data = {
+                            "property_id": prop['doc_id'],
+                            "property_title": prop.get('title', 'N/A'),
+                            "buyer_name": buyer_name,
+                            "buyer_phone": buyer_phone
+                        }
+                        db.collection('leads').add(lead_data)
+                        st.success("✅ Thanks! Your details have been sent.")
+                    else:
+                        st.warning("⚠️ कृपया अपना नाम और मोबाइल नंबर भरें।")
+
+            # Admin Delete Button
+            if st.session_state.get('admin_logged_in', False):
+                if st.button("🗑️ Delete Property", key=f"del_{prop['doc_id']}"):
+                    db.collection('properties').document(prop['doc_id']).delete()
+                    st.rerun()
+            st.markdown("---")
+
+# --- Page 2: Vendor Ecosystem (with Filters) ---
 def show_vendor_ecosystem():
-    st.markdown('<h2 style="color: #0f766e; font-weight:700;">🛠️ Vendor Ecosystem</h2>', unsafe_allow_html=True)
+    st.title("🛠️ Vendor Ecosystem")
     
-    raw_data = fetch_all_vendors()
-    if not raw_data:
-        st.info("No vendors found. Please register vendors via the Admin Panel.")
+    st.markdown("### 🔍 Find Service Providers")
+    col1, col2 = st.columns(2)
+    with col1:
+        search_service = st.selectbox("🛠️ Service Type", ["All", "Architecture", "Legal Advisor", "Plumber", "Electrician", "Interior Designer"])
+    with col2:
+        search_loc = st.text_input("📍 Location (e.g. Nagpur)").lower()
+
+    st.markdown("---")
+    
+    vendors = fetch_all_vendors()
+    for vendor in vendors:
+        # Filters Logic
+        if search_service != "All" and search_service != vendor.get('service_type', ''):
+            continue
+        if search_loc and search_loc not in vendor.get('location', '').lower():
+            continue
+
+        with st.container():
+            st.subheader(vendor.get('name', 'N/A'))
+            st.markdown(f"**🛠️ Service:** {vendor.get('service_type', 'N/A')} | **📍 Location:** {vendor.get('location', 'N/A')}")
+            st.markdown(f"**📞 Contact:** {vendor.get('contact', 'N/A')}")
+            
+            # Admin Delete Button
+            if st.session_state.get('admin_logged_in', False):
+                if st.button("🗑️ Delete Vendor", key=f"del_ven_{vendor['doc_id']}"):
+                    db.collection('vendors').document(vendor['doc_id']).delete()
+                    st.rerun()
+            st.markdown("---")
+
+# --- Page 3: Admin Panel (with Login) ---
+def show_admin_panel():
+    st.title("🔐 Admin Panel")
+
+    # Login System
+    if 'admin_logged_in' not in st.session_state:
+        st.session_state['admin_logged_in'] = False
+
+    if not st.session_state['admin_logged_in']:
+        st.info("डेटा ऐड करने के लिए एडमिन पासवर्ड डालें।")
+        pwd = st.text_input("Admin Password", type="password")
+        if st.button("Login"):
+            if pwd == "Firstchoice@123":
+                st.session_state['admin_logged_in'] = True
+                st.rerun()
+            else:
+                st.error("❌ गलत पासवर्ड!")
         return
 
-    df = pd.DataFrame(raw_data)
-    
-    col1, col2, col3 = st.columns(3)
-    category_filter = col1.selectbox("Select Service", ["All"] + list(df["Category"].unique()))
-    location_filter = col2.selectbox("Location", ["All"] + list(df["Location"].unique()))
-    max_exp = int(df["Experience_Years"].max()) if not df.empty else 30
-    exp_filter = col3.slider("Min Experience (Years)", 0, max_exp, 0)
-    
-    with st.expander("⭐ Trust Filters"):
-        rating_filter = st.slider("Minimum Rating", 1.0, 5.0, 4.0, 0.1)
-        verified_filter = st.checkbox("Verified Partners Only", value=True)
+    if st.button("Logout 🚪"):
+        st.session_state['admin_logged_in'] = False
+        st.rerun()
+    st.markdown("---")
 
-    st.divider()
+    # Admin Tabs
+    tab1, tab2, tab3 = st.tabs(["🏠 Add Property", "🛠️ Add Vendor", "📞 View Leads"])
     
-    filtered_vendors = df.copy()
-    if category_filter != "All": filtered_vendors = filtered_vendors[filtered_vendors["Category"] == category_filter]
-    if location_filter != "All": filtered_vendors = filtered_vendors[filtered_vendors["Location"] == location_filter]
-    filtered_vendors = filtered_vendors[filtered_vendors["Experience_Years"] >= exp_filter]
-    filtered_vendors = filtered_vendors[filtered_vendors["Rating"] >= rating_filter]
-    if verified_filter: filtered_vendors = filtered_vendors[filtered_vendors["Verified"] == "Yes"]
-        
-    st.markdown(f"<p style='color:#64748b; font-weight:600;'>{len(filtered_vendors)} Professionals Found</p>", unsafe_allow_html=True)
-    
-    for _, row in filtered_vendors.iterrows():
-        verified_html = '<span class="verified-tag">✓ Verified Partner</span>' if row.get('Verified') == 'Yes' else ''
-        st.markdown(f"""
-        <div class="vendor-card">
-            <h4 style="margin:0; color:#0f172a; font-size:1.2rem; font-weight: 700;">{row.get('Vendor_Name', 'N/A')}</h4>
-            <p style="margin:6px 0; color:#64748b;">🛠️ {row.get('Category', 'N/A')} | 📍 {row.get('Location', 'N/A')}</p>
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
-                <span style="color:#eab308; font-weight:700;">⭐ {row.get('Rating', 0)}</span>
-                <span style="color:#475569; font-weight: 500;">💼 {row.get('Experience_Years', 0)} Years Exp.</span>
-                {verified_html}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-
-# ---------------------------------------------------------
-# 7. MODULE 4: ADMIN PANEL
-# ---------------------------------------------------------
-def show_admin_panel():
-    st.markdown('<h2 style="color: #1e3a8a; font-weight:700;">🔐 Admin Control Panel</h2>', unsafe_allow_html=True)
-    
-    tab1, tab2 = st.tabs(["🏢 Add New Property", "🛠️ Add New Vendor"])
-
     with tab1:
-        st.markdown('<div class="admin-card">', unsafe_allow_html=True)
-        with st.form("property_form", clear_on_submit=True):
-            p_name = st.text_input("Property Name")
-            col1, col2 = st.columns(2)
-            p_type = col1.selectbox("Property Type", ["Plot", "Flat", "Villa", "Commercial"])
-            p_loc = col2.text_input("Location", placeholder="e.g., New Amar Nagar")
-            col3, col4 = st.columns(2)
-            p_budget = col3.number_input("Budget (₹ Lakhs)", min_value=1, max_value=1000, value=25)
-            p_facing = col4.selectbox("Facing", ["East", "West", "North", "South"])
-            col5, col6 = st.columns(2)
-            p_rera = col5.radio("RERA Approved?", ["Yes", "No"], horizontal=True)
-            p_status = col6.selectbox("Status", ["Ready to Move", "Under Construction"])
-
-            if st.form_submit_button("🚀 Upload Property", type="primary", use_container_width=True):
-                if p_name.strip() and p_loc.strip():
-                    if add_property({"Property_Name": p_name, "Type": p_type, "Location": p_loc, "Budget_Lakhs": p_budget, "Facing": p_facing, "RERA_Approved": p_rera, "Status": p_status}):
-                        st.success("✅ Property uploaded to Firebase successfully!")
-                else:
-                    st.error("Please fill Name and Location.")
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.subheader("Add New Property")
+        title = st.text_input("Property Title (e.g., Luxury 2BHK)")
+        prop_type = st.selectbox("Property Type", ["Flat / Apartment", "Plot / Land", "Villa / Independent House", "Commercial"])
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            price = st.number_input("Price (₹)", min_value=0)
+            area = st.text_input("Area (Sq Ft / Sq Yd)")
+            bhk = st.selectbox("BHK", ["N/A", "1 BHK", "2 BHK", "3 BHK", "4+ BHK"])
+        with col2:
+            location = st.text_input("Location / City")
+            status = st.selectbox("Status", ["Ready to Move", "Under Construction", "New Launch", "Sold Out"])
+            rera_id = st.text_input("RERA Registration No. (Optional)")
+        
+        amenities = st.multiselect("Amenities", ["Parking", "Lift", "Garden", "Security", "Club House", "Gym", "Power Backup"])
+        image_url = st.text_input("Property Image URL (Optional)")
+        
+        if st.button("Upload Property"):
+            if title and location and price:
+                data = {
+                    "title": title, "prop_type": prop_type, "price": price, 
+                    "area": area, "bhk": bhk, "location": location, 
+                    "status": status, "rera_id": rera_id, "amenities": amenities,
+                    "image_url": image_url
+                }
+                db.collection('properties').add(data)
+                st.success("✅ प्रॉपर्टी लाइव हो गई!")
+            else:
+                st.warning("कृपया टाइटल, लोकेशन और प्राइस जरूर भरें।")
 
     with tab2:
-        st.markdown('<div class="admin-card">', unsafe_allow_html=True)
-        with st.form("vendor_form", clear_on_submit=True):
-            v_name = st.text_input("Vendor Name")
-            col1, col2 = st.columns(2)
-            v_cat = col1.selectbox("Category", ["Architect", "Contractor", "Painter", "Interior Designer", "Hardware", "Vastu / Priest", "Plumber", "Fabricator"])
-            v_loc = col2.text_input("Location", placeholder="e.g., Wardha Road")
-            col3, col4 = st.columns(2)
-            v_exp = col3.number_input("Experience (Years)", min_value=0, max_value=50, value=5)
-            v_rating = col4.slider("Rating", 1.0, 5.0, 4.5, 0.1)
-            v_verified = st.radio("Verified Partner?", ["Yes", "No"], horizontal=True)
+        st.subheader("Add New Vendor")
+        v_name = st.text_input("Vendor Name")
+        v_service = st.selectbox("Service Type", ["Architecture", "Legal Advisor", "Plumber", "Electrician", "Interior Designer"])
+        v_location = st.text_input("Service Location")
+        v_contact = st.text_input("Contact Number")
+        
+        if st.button("Add Vendor"):
+            if v_name and v_contact:
+                db.collection('vendors').add({
+                    "name": v_name, "service_type": v_service,
+                    "location": v_location, "contact": v_contact
+                })
+                st.success("✅ Vendor Added!")
 
-            if st.form_submit_button("🚀 Register Vendor", type="primary", use_container_width=True):
-                if v_name.strip() and v_loc.strip():
-                    if add_vendor({"Vendor_Name": v_name, "Category": v_cat, "Location": v_loc, "Experience_Years": v_exp, "Rating": v_rating, "Verified": v_verified}):
-                        st.success("✅ Vendor registered to Firebase successfully!")
-                else:
-                    st.error("Please fill Name and Location.")
-        st.markdown('</div>', unsafe_allow_html=True)
+    with tab3:
+        st.subheader("📞 Customer Leads (कस्टमर पूछताछ)")
+        leads = fetch_all_leads()
+        
+        if not leads:
+            st.info("अभी तक कोई नई लीड नहीं आई है।")
+        else:
+            for lead in leads:
+                with st.container():
+                    st.markdown(f"**🏡 Property:** {lead.get('property_title', 'N/A')}")
+                    st.markdown(f"**👤 Name:** {lead.get('buyer_name', 'N/A')}")
+                    st.markdown(f"**📱 Phone:** {lead.get('buyer_phone', 'N/A')}")
+                    
+                    if st.button("🗑️ Delete Lead", key=f"del_lead_{lead['doc_id']}"):
+                        db.collection('leads').document(lead['doc_id']).delete()
+                        st.rerun()
+                    st.markdown("---")
 
-
-# ---------------------------------------------------------
-# 8. MASTER ROUTER (Zero-Flicker Navigation)
-# ---------------------------------------------------------
+# --- Main App Navigation ---
 def main():
-    st.sidebar.markdown("<h3 style='color:#0f172a; font-weight:700;'>🌟 Navigation Menu</h3>", unsafe_allow_html=True)
-    
-    menu = [
-        "🏠 Home (Dashboard)", 
-        "🏢 Property Listings", 
-        "🛠️ Vendor Ecosystem", 
-        "🔐 Admin Panel"
-    ]
-    choice = st.sidebar.radio("", menu)
-    
-    st.sidebar.write("---")
-    st.sidebar.markdown("<small style='color:#64748b; font-weight:500;'>⚡ Single-Page Architecture</small>", unsafe_allow_html=True)
+    st.sidebar.title("Firstchoice Infra")
+    menu = ["🏢 Property Listings", "🛠️ Vendor Ecosystem", "🔐 Admin Panel"]
+    choice = st.sidebar.radio("Navigation", menu)
 
-    if choice == "🏠 Home (Dashboard)":
-        show_home()
-    elif choice == "🏢 Property Listings":
+    if choice == "🏢 Property Listings":
         show_property_listings()
     elif choice == "🛠️ Vendor Ecosystem":
         show_vendor_ecosystem()
     elif choice == "🔐 Admin Panel":
         show_admin_panel()
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
