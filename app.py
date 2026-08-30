@@ -7,7 +7,7 @@ import json
 # --- Page Config ---
 st.set_page_config(page_title="PropertyHub Premium", page_icon="🏢", layout="wide")
 
-# --- Custom CSS (Sidebar & WhatsApp Button) ---
+# --- Custom CSS (Sidebar & Buttons) ---
 st.markdown(
     """
     <style>
@@ -27,6 +27,10 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
+# --- Session State for Wishlist ---
+if 'wishlist' not in st.session_state:
+    st.session_state['wishlist'] = []
 
 # --- Firebase Initialization ---
 if not firebase_admin._apps:
@@ -76,20 +80,32 @@ def show_property_listings():
     st.markdown("---")
     properties = fetch_all_properties()
     
+    # --- Featured Properties Section ---
+    featured_props = [p for p in properties if p.get('is_featured', False)]
+    if featured_props and not (search_loc or search_type != "All" or max_budget > 0):
+        st.subheader("⭐ Featured Projects")
+        cols = st.columns(len(featured_props) if len(featured_props) < 3 else 3)
+        for i, prop in enumerate(featured_props[:3]):
+            with cols[i % 3]:
+                if prop.get('image_url'):
+                    st.image(prop['image_url'], use_container_width=True)
+                st.markdown(f"**{prop.get('title', 'N/A')}**")
+                st.caption(f"📍 {prop.get('location', '')} | ₹{prop.get('price', 0):,}")
+        st.markdown("---")
+    
+    # --- All Properties ---
+    st.subheader("🏠 All Properties")
     for prop in properties:
         if search_loc and search_loc not in prop.get('location', '').lower(): continue
         if search_type != "All" and search_type != prop.get('prop_type', ''): continue
         if max_budget > 0 and prop.get('price', 0) > max_budget: continue
 
         with st.container():
-            # Photos & Videos
             col_img, col_vid = st.columns(2)
             with col_img:
-                if prop.get('image_url'):
-                    st.image(prop['image_url'], use_container_width=True)
+                if prop.get('image_url'): st.image(prop['image_url'], use_container_width=True)
             with col_vid:
-                if prop.get('video_url'):
-                    st.video(prop['video_url'])
+                if prop.get('video_url'): st.video(prop['video_url'])
             
             # Title & MahaRERA Badge
             if prop.get('rera_id'):
@@ -104,12 +120,19 @@ def show_property_listings():
             if prop.get('amenities'):
                 st.write(f"✨ **Amenities:** {', '.join(prop.get('amenities', []))}")
 
-            # Contact Section (WhatsApp + Lead Form)
+            # Wishlist Button
+            if prop['doc_id'] in st.session_state['wishlist']:
+                st.button("❤️ Saved in Wishlist", disabled=True, key=f"wish_{prop['doc_id']}")
+            else:
+                if st.button("🤍 Save to Wishlist", key=f"wish_{prop['doc_id']}"):
+                    st.session_state['wishlist'].append(prop['doc_id'])
+                    st.rerun()
+
+            # Contact Section
             st.markdown("### 🤝 Interested?")
             col_wa, col_form = st.columns(2)
-            
             with col_wa:
-                admin_phone = "919000000000" # <-- यहाँ अपना व्हाट्सएप नंबर डालें (91 के साथ)
+                admin_phone = "919000000000" # <-- यहाँ अपना व्हाट्सएप नंबर डालें
                 msg = f"Hello Firstchoice Infra, I am interested in {prop.get('title', 'Property')} at {prop.get('location', '')}."
                 wa_link = f"https://wa.me/{admin_phone}?text={msg.replace(' ', '%20')}"
                 st.markdown(f'<a href="{wa_link}" target="_blank" class="whatsapp-btn">💬 Chat on WhatsApp</a>', unsafe_allow_html=True)
@@ -128,8 +151,9 @@ def show_property_listings():
                         else:
                             st.warning("⚠️ कृपया अपना नाम और मोबाइल नंबर भरें।")
 
-            if st.session_state.get('admin_logged_in', False):
-                if st.button("🗑️ Delete Property", key=f"del_{prop['doc_id']}"):
+            # Admin Delete Option
+            if st.session_state.get('admin_logged_in', False) and st.session_state.get('user_role') == 'Admin':
+                if st.button("🗑️ Delete Property (Admin Only)", key=f"del_{prop['doc_id']}"):
                     db.collection('properties').document(prop['doc_id']).delete()
                     st.rerun()
             st.markdown("---")
@@ -144,8 +168,7 @@ def show_vendor_ecosystem():
         search_loc = st.text_input("📍 Location (e.g. Nagpur)").lower()
 
     st.markdown("---")
-    vendors = fetch_all_vendors()
-    for vendor in vendors:
+    for vendor in fetch_all_vendors():
         if search_service != "All" and search_service != vendor.get('service_type', ''): continue
         if search_loc and search_loc not in vendor.get('location', '').lower(): continue
 
@@ -154,24 +177,37 @@ def show_vendor_ecosystem():
             st.markdown(f"**🛠️ Service:** {vendor.get('service_type', 'N/A')} | **📍 Location:** {vendor.get('location', 'N/A')}")
             st.markdown(f"**📞 Contact:** {vendor.get('contact', 'N/A')}")
             
-            if st.session_state.get('admin_logged_in', False):
+            if st.session_state.get('admin_logged_in', False) and st.session_state.get('user_role') == 'Admin':
                 if st.button("🗑️ Delete Vendor", key=f"del_ven_{vendor['doc_id']}"):
                     db.collection('vendors').document(vendor['doc_id']).delete()
                     st.rerun()
             st.markdown("---")
 
-# --- Page 3: Admin Panel ---
+# --- Page 3: Admin & Sales Login ---
 def show_admin_panel():
-    st.title("🔐 Admin Panel")
+    st.title("🔐 Company Portal (Admin & Sales)")
     if 'admin_logged_in' not in st.session_state: st.session_state['admin_logged_in'] = False
 
     if not st.session_state['admin_logged_in']:
-        pwd = st.text_input("Admin Password", type="password")
-        if st.button("Login") and pwd == "Firstchoice@123":
-            st.session_state['admin_logged_in'] = True
-            st.rerun()
+        st.info("डेटा ऐड करने के लिए लॉगिन करें।")
+        username = st.selectbox("Select Role", ["Admin", "Sales Executive"])
+        pwd = st.text_input("Password", type="password")
+        
+        if st.button("Login"):
+            # Role-Based Passwords
+            if username == "Admin" and pwd == "Firstchoice@123":
+                st.session_state['admin_logged_in'] = True
+                st.session_state['user_role'] = 'Admin'
+                st.rerun()
+            elif username == "Sales Executive" and pwd == "Sales@123": # सेल्स टीम का पासवर्ड
+                st.session_state['admin_logged_in'] = True
+                st.session_state['user_role'] = 'Sales Executive'
+                st.rerun()
+            else:
+                st.error("❌ गलत पासवर्ड!")
         return
 
+    st.success(f"Logged in as: {st.session_state.get('user_role')}")
     if st.button("Logout 🚪"):
         st.session_state['admin_logged_in'] = False
         st.rerun()
@@ -180,7 +216,7 @@ def show_admin_panel():
     tab1, tab2, tab3 = st.tabs(["🏠 Add Property", "🛠️ Add Vendor", "📞 View Leads"])
     
     with tab1:
-        st.subheader("Add New Property (Advanced)")
+        st.subheader("Add New Property")
         title = st.text_input("Property Title")
         prop_type = st.selectbox("Property Type", ["Flat / Apartment", "Plot / Land", "Villa / Independent House", "Commercial"])
         
@@ -192,18 +228,25 @@ def show_admin_panel():
         with col2:
             location = st.text_input("Location / City")
             status = st.selectbox("Status", ["Ready to Move", "Under Construction", "New Launch", "Sold Out"])
-            rera_id = st.text_input("MahaRERA Reg No. (Optional - बैज के लिए)")
+            rera_id = st.text_input("MahaRERA Reg No. (Optional)")
         
         amenities = st.multiselect("Amenities", ["Parking", "Lift", "Garden", "Security", "Club House", "Gym", "Power Backup"])
         image_url = st.text_input("Property Image URL")
         video_url = st.text_input("YouTube / 3D Video URL (Optional)")
         
+        # Featured Checkbox (Only Admin can feature a project)
+        is_featured = False
+        if st.session_state.get('user_role') == 'Admin':
+            is_featured = st.checkbox("⭐ Mark as Featured Project (होमपेज पर सबसे ऊपर दिखेगा)")
+
         if st.button("Upload Property"):
             if title and location and price:
                 db.collection('properties').add({
                     "title": title, "prop_type": prop_type, "price": price, "area": area, 
                     "bhk": bhk, "location": location, "status": status, "rera_id": rera_id, 
-                    "amenities": amenities, "image_url": image_url, "video_url": video_url
+                    "amenities": amenities, "image_url": image_url, "video_url": video_url,
+                    "is_featured": is_featured,
+                    "added_by": st.session_state.get('user_role') # ट्रैक करेगा किसने ऐड किया
                 })
                 st.success("✅ प्रॉपर्टी लाइव हो गई!")
 
@@ -221,18 +264,38 @@ def show_admin_panel():
         st.subheader("📞 Customer Leads")
         for lead in fetch_all_leads():
             st.markdown(f"🏡 {lead.get('property_title', 'N/A')} | 👤 {lead.get('buyer_name', 'N/A')} | 📱 {lead.get('buyer_phone', 'N/A')}")
-            if st.button("🗑️ Delete", key=f"del_lead_{lead['doc_id']}"):
-                db.collection('leads').document(lead['doc_id']).delete()
+            # Only Admin can delete leads
+            if st.session_state.get('user_role') == 'Admin':
+                if st.button("🗑️ Delete", key=f"del_lead_{lead['doc_id']}"):
+                    db.collection('leads').document(lead['doc_id']).delete()
+                    st.rerun()
+            st.markdown("---")
+
+# --- My Wishlist Page ---
+def show_wishlist():
+    st.title("❤️ My Wishlist")
+    if not st.session_state['wishlist']:
+        st.info("अभी तक आपने कोई प्रॉपर्टी सेव नहीं की है।")
+        return
+        
+    properties = fetch_all_properties()
+    saved_props = [p for p in properties if p['doc_id'] in st.session_state['wishlist']]
+    
+    for prop in saved_props:
+        with st.container():
+            st.subheader(prop.get('title', 'N/A'))
+            st.markdown(f"📍 {prop.get('location', '')} | 🏷️ **₹{prop.get('price', 0):,}**")
+            if st.button("❌ Remove from Wishlist", key=f"rem_{prop['doc_id']}"):
+                st.session_state['wishlist'].remove(prop['doc_id'])
                 st.rerun()
             st.markdown("---")
 
-# --- Sidebar EMI Calculator & Main App ---
+# --- Main App ---
 def main():
     st.sidebar.title("Firstchoice Infra")
-    menu = ["🏢 Property Listings", "🛠️ Vendor Ecosystem", "🔐 Admin Panel"]
+    menu = ["🏢 Property Listings", "❤️ My Wishlist", "🛠️ Vendor Ecosystem", "🔐 Company Portal"]
     choice = st.sidebar.radio("Navigation", menu)
     
-    # EMI Calculator in Sidebar
     st.sidebar.markdown("---")
     st.sidebar.subheader("🧮 EMI Calculator")
     loan_amt = st.sidebar.number_input("Loan Amount (₹)", value=1500000, step=100000)
@@ -245,8 +308,9 @@ def main():
         st.sidebar.success(f"Monthly EMI: ₹{int(emi):,}")
 
     if choice == "🏢 Property Listings": show_property_listings()
+    elif choice == "❤️ My Wishlist": show_wishlist()
     elif choice == "🛠️ Vendor Ecosystem": show_vendor_ecosystem()
-    elif choice == "🔐 Admin Panel": show_admin_panel()
+    elif choice == "🔐 Company Portal": show_admin_panel()
 
 if __name__ == '__main__':
     main()
