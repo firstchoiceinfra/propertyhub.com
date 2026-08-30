@@ -17,27 +17,36 @@ st.set_page_config(page_title="PropertyHub Premium", layout="wide", initial_side
 def init_firebase():
     if not firebase_admin._apps:
         try:
+            # Check if JSON string is used
             if "FIREBASE_JSON" in st.secrets:
-                cred_dict = json.loads(st.secrets["FIREBASE_JSON"])
+                raw_json = st.secrets["FIREBASE_JSON"]
+                # strict=False fixes the 'Invalid control character' error
+                cred_dict = json.loads(raw_json, strict=False)
+                
+            # Fallback for standard TOML format
             elif "firebase" in st.secrets:
                 cred_dict = dict(st.secrets["firebase"])
-                if "private_key" in cred_dict:
-                    cred_dict["private_key"] = cred_dict["private_key"].replace("\\n", "\n").replace("\\\\n", "\n")
             else:
                 st.error("🔥 Firebase secrets missing in Streamlit Cloud!")
                 st.stop()
+            
+            # CRITICAL FIX: Ensure private key newlines are parsed correctly
+            if "private_key" in cred_dict:
+                cred_dict["private_key"] = cred_dict["private_key"].replace("\\n", "\n").replace("\\\\n", "\n")
                 
             cred = credentials.Certificate(cred_dict)
             firebase_admin.initialize_app(cred)
+            
         except Exception as e:
-            st.error("🔥 Firebase Connection Error! कृपया असली JSON डेटा Secrets में डालें।")
+            st.error("🔥 Firebase Connection Error! कृपया असली JSON डेटा Secrets में सही फॉर्मेट में डालें।")
             st.write(f"Details: {e}")
             st.stop()
+            
     return firestore.client()
 
 db = init_firebase()
 
-# Database Helper Functions
+# --- Database Helper Functions ---
 def fetch_all_properties():
     return [doc.to_dict() for doc in db.collection('properties').stream()]
 
@@ -113,7 +122,7 @@ def show_home():
     
     col1, col2, col3 = st.columns(3)
     with col1: st.markdown('<div class="kpi-card"><div class="kpi-value">Live</div><div class="kpi-label">Firebase Connected</div></div>', unsafe_allow_html=True)
-    with col2: st.markdown('<div class="kpi-card" style="border-top-color:#10b981;"><div class="kpi-value">340+</div><div class="kpi-label">Verified Partners</div></div>', unsafe_allow_html=True)
+    with col2: st.markdown('<div class="kpi-card" style="border-top-color:#10b981;"><div class="kpi-value">Verified</div><div class="kpi-label">Partners & Vendors</div></div>', unsafe_allow_html=True)
     with col3: st.markdown('<div class="kpi-card" style="border-top-color:#f59e0b;"><div class="kpi-value">Zero</div><div class="kpi-label">Flicker Navigation</div></div>', unsafe_allow_html=True)
 
 
